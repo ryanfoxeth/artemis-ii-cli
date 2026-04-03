@@ -58,7 +58,7 @@ const telemetryBox = blessed.box({
 
 // ─── Orion Tracker ──────────────────────────────────────────────────
 const trackerBox = blessed.box({
-  parent: mainBox, top: 3, left: '36%', width: '63%', height: 9,
+  parent: mainBox, top: 3, left: '36%', width: '63%', height: 7,
   label: ` ${BLOCKS.diamond} ORION TRACKER `,
   tags: true,
   border: { type: 'line' },
@@ -84,7 +84,7 @@ const velocityBox = blessed.box({
 
 // ─── Mission Timeline ───────────────────────────────────────────────
 const timelineBox = blessed.box({
-  parent: mainBox, top: 12, left: '36%', width: '63%', height: 12,
+  parent: mainBox, top: 10, left: '36%', width: '63%', height: 11,
   label: ` ${BLOCKS.diamond} MISSION TIMELINE `,
   tags: true,
   border: { type: 'line' },
@@ -97,7 +97,7 @@ const timelineBox = blessed.box({
 
 // ─── Crew Box ───────────────────────────────────────────────────────
 const crewBox = blessed.box({
-  parent: mainBox, top: 24, left: 1, width: '98%', height: 5,
+  parent: mainBox, top: 21, left: 1, width: '98%', height: 4,
   label: ` ${BLOCKS.diamond} CREW — ARTEMIS II `,
   tags: true,
   border: { type: 'line' },
@@ -199,61 +199,52 @@ function renderTracker() {
   }
 
   const d = telemetry;
-  const innerWidth = Math.max(30, (trackerBox.width || 60) - 4);
-  const ratio = Math.min(1, Math.max(0, d.earth.distance_km / EARTH_MOON_KM));
-  const trackLen = innerWidth - 6;
-  const orionPos = Math.round(ratio * (trackLen - 1));
+  const boxW = (trackerBox.width || 60) - 4;
+  const trackLen = boxW - 2; // room for Earth ● and Moon ○
+  const ratio = Math.min(0.95, Math.max(0.05, d.earth.distance_km / EARTH_MOON_KM));
+  const orionPos = Math.round(ratio * trackLen);
 
-  // Distance labels
   const earthLabel = fmtDist(d.earth.distance_km, d.earth.distance_miles);
   const moonLabel = fmtDist(d.moon.distance_km, d.moon.distance_miles);
 
-  // Build starfield line
-  let stars = '';
-  for (let i = 0; i < innerWidth; i++) {
-    stars += (i * 7 + 3) % 11 === 0 ? '{black-fg}·{/black-fg}' : ' ';
-  }
+  // Line 1: distance labels positioned above the track
+  const pad1 = Math.max(1, orionPos - Math.floor(earthLabel.length / 2));
+  const gap1 = Math.max(1, trackLen - orionPos - Math.floor(moonLabel.length / 2) - pad1 - earthLabel.length + 2);
+  const distLine = ' '.repeat(pad1) + `{yellow-fg}${earthLabel}{/yellow-fg}` +
+    ' '.repeat(gap1) + `{yellow-fg}${moonLabel}{/yellow-fg}`;
 
-  // Build track with trajectory
-  let track = '';
+  // Line 2: the track itself — all one string, no wrapping
+  // Build as array of single chars, then join
+  const chars = [];
+  chars.push('{blue-fg}●{/blue-fg}');
   for (let i = 0; i < trackLen; i++) {
     if (i === orionPos) {
-      track += '{bold}{yellow-fg}◆{/yellow-fg}{/bold}';
+      chars.push('{yellow-fg}◆{/yellow-fg}');
     } else if (i < orionPos) {
-      track += '{yellow-fg}─{/yellow-fg}';
+      chars.push('{yellow-fg}─{/yellow-fg}');
     } else {
-      track += '{black-fg}╌{/black-fg}';
+      chars.push('{black-fg}·{/black-fg}');
     }
   }
+  chars.push('{white-fg}●{/white-fg}');
+  const trackLine = chars.join('');
 
-  // Scale bar
-  const maxDist = useMiles ? EARTH_MOON_MI : EARTH_MOON_KM;
-  const unit = useMiles ? 'mi' : 'km';
-  const seg = Math.floor(trackLen / 4);
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(p => `${fmtNum(Math.round(maxDist * p))}${p === 0 ? unit : ''}`);
-  let scaleLine = '{black-fg}';
-  let pos = 0;
-  for (let i = 0; i < ticks.length; i++) {
-    const target = i * seg;
-    scaleLine += ' '.repeat(Math.max(0, target - pos));
-    scaleLine += `│${ticks[i]}`;
-    pos = target + ticks[i].length + 1;
-  }
-  scaleLine += '{/black-fg}';
-
-  const earthDistLine = ' '.repeat(Math.max(0, Math.floor(orionPos / 2) - earthLabel.length / 2 + 3)) +
-    `{yellow-fg}${earthLabel}{/yellow-fg}` +
-    ' '.repeat(Math.max(1, trackLen - orionPos - moonLabel.length / 2 - earthLabel.length / 2)) +
-    `{yellow-fg}${moonLabel}{/yellow-fg}`;
+  // Line 3: labels
+  const earthW = 5; // "EARTH"
+  const orionW = 5; // "ORION"
+  const moonW = 4;  // "MOON"
+  const lbl1gap = Math.max(1, orionPos - earthW + 1);
+  const lbl2gap = Math.max(1, trackLen - orionPos - orionW + 1);
+  const lblLine = '{blue-fg}EARTH{/blue-fg}' +
+    ' '.repeat(lbl1gap) +
+    '{yellow-fg}ORION{/yellow-fg}' +
+    ' '.repeat(lbl2gap) +
+    '{white-fg}MOON{/white-fg}';
 
   trackerBox.setContent([
-    stars,
-    earthDistLine,
-    `  {bold}{blue-fg}●{/blue-fg}{/bold} ${track} {white-fg}○{/white-fg}`,
-    `  {blue-fg}EARTH{/blue-fg}` + ' '.repeat(Math.max(1, orionPos - 3)) +
-      `{yellow-fg}ORION{/yellow-fg}` +
-      ' '.repeat(Math.max(1, trackLen - orionPos - 7)) + `{white-fg}MOON{/white-fg}`,
-    `  ${scaleLine}`,
+    distLine,
+    trackLine,
+    lblLine,
   ].join('\n'));
 }
 
@@ -324,24 +315,12 @@ function renderTimeline() {
 }
 
 function renderCrew() {
-  const cards = CREW.map(c => {
-    return `{cyan-fg}┌──────────────────────┐{/cyan-fg}\n` +
-           `{cyan-fg}│{/cyan-fg} {bold}{white-fg}${c.name}{/white-fg}{/bold}` +
-           ' '.repeat(Math.max(0, 20 - c.name.length)) + `{cyan-fg}│{/cyan-fg}\n` +
-           `{cyan-fg}│{/cyan-fg} {black-fg}${c.role}{/black-fg}` +
-           ' '.repeat(Math.max(0, 20 - c.role.length)) + `{cyan-fg}│{/cyan-fg}\n` +
-           `{cyan-fg}└──────────────────────┘{/cyan-fg}`;
-  });
+  const line = CREW.map(c => {
+    return `{bold}{white-fg}${c.name}{/white-fg}{/bold} {black-fg}${c.role}{/black-fg}`;
+  }).join('  {cyan-fg}│{/cyan-fg}  ');
 
-  // Lay out cards side by side
-  const cardLines = cards.map(c => c.split('\n'));
-  const rows = cardLines[0].length;
-  const combined = [];
-  for (let row = 0; row < rows; row++) {
-    combined.push(cardLines.map(c => c[row] || '').join('  '));
-  }
-  crewBox.setContent(combined.join('\n'));
-  crewBox.height = rows + 2;
+  crewBox.setContent(`\n ${line}`);
+  crewBox.height = 4;
 }
 
 function renderStatusBar() {
