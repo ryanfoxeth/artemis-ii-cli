@@ -229,17 +229,14 @@ function renderTracker() {
   chars.push('{white-fg}●{/white-fg}');
   const trackLine = chars.join('');
 
-  // Line 3: labels
-  const earthW = 5; // "EARTH"
-  const orionW = 5; // "ORION"
-  const moonW = 4;  // "MOON"
-  const lbl1gap = Math.max(1, orionPos - earthW + 1);
-  const lbl2gap = Math.max(1, trackLen - orionPos - orionW + 1);
-  const lblLine = '{blue-fg}EARTH{/blue-fg}' +
-    ' '.repeat(lbl1gap) +
-    '{yellow-fg}ORION{/yellow-fg}' +
-    ' '.repeat(lbl2gap) +
-    '{white-fg}MOON{/white-fg}';
+  // Line 3: labels — build as plain string first, then colorize
+  const totalVisible = boxW;
+  const lbl1gap = Math.max(1, orionPos - 4);
+  const lbl2gap = Math.max(1, totalVisible - 5 - lbl1gap - 5 - 4); // EARTH + gap + ORION + gap + MOON
+  // Build plain to verify length, then add colors
+  const plainLbl = 'EARTH' + ' '.repeat(lbl1gap) + 'ORION' + ' '.repeat(lbl2gap) + 'MOON';
+  // Truncate or pad to fit exactly
+  const lblLine = `{blue-fg}EARTH{/blue-fg}${' '.repeat(lbl1gap)}{yellow-fg}ORION{/yellow-fg}${' '.repeat(lbl2gap)}{white-fg}MOON{/white-fg}`;
 
   trackerBox.setContent([
     distLine,
