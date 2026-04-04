@@ -7,11 +7,13 @@ A terminal-based (TUI) tracker for the Artemis II mission, showing live spacecra
 ## Features
 
 - Live Orion spacecraft position relative to Earth and Moon
+- High-frequency live telemetry extrapolation at 4 FPS
+- Observer tracking for Sky Position (RA/DEC) and Communications Delay (Light-Time)
 - ASCII tracker visualization showing Orion's position between Earth and Moon
 - Mission timeline with color-coded event status
 - Velocity vector display
 - Crew manifest
-- Auto-refreshes every 2 minutes
+- Network polling synchronizes every 2 minutes to prevent API rate limits
 - Toggle between km and miles
 
 ## Install
@@ -36,7 +38,7 @@ npm start
 | `q` | Quit |
 | `Ctrl+C` | Quit |
 | `m` | Toggle miles/km |
-| `r` | Force refresh |
+| `r` | Force refresh API data |
 
 ## Data Source
 
