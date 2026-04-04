@@ -177,15 +177,16 @@ function renderTelemetry() {
   const earthPct = Math.min(1, d.earth.distance_km / EARTH_MOON_KM);
   const moonPct = Math.min(1, d.moon.distance_km / EARTH_MOON_KM);
 
+  const barW = Math.max(5, (telemetryBox.width || 30) - 6);
   const lines = [
     `{cyan-fg}SPACECRAFT{/cyan-fg}  {bold}{white-fg}${d.spacecraft}{/white-fg}{/bold}`,
     `{cyan-fg}PHASE     {/cyan-fg}  {bold}{yellow-fg}${d.mission_phase}{/yellow-fg}{/bold}`,
     `{cyan-fg}MET       {/cyan-fg}  {white-fg}${d.mission_elapsed.formatted}{/white-fg}`,
     ``,
     `{cyan-fg}EARTH DIST{/cyan-fg}  {white-fg}${fmtDist(d.earth.distance_km, d.earth.distance_miles)}{/white-fg}`,
-    `  {blue-fg}${progressBar(earthPct, 26, '▓', '░')}{/blue-fg}`,
+    `  {blue-fg}${progressBar(earthPct, barW, '▓', '░')}{/blue-fg}`,
     `{cyan-fg}MOON DIST {/cyan-fg}  {white-fg}${fmtDist(d.moon.distance_km, d.moon.distance_miles)}{/white-fg}`,
-    `  {white-fg}${progressBar(1 - moonPct, 26, '▓', '░')}{/white-fg}`,
+    `  {white-fg}${progressBar(1 - moonPct, barW, '▓', '░')}{/white-fg}`,
     `{cyan-fg}SPEED     {/cyan-fg}  {white-fg}${fmtSpeed(d.earth.speed_kmph, d.earth.speed_mph)}{/white-fg}`,
     `{cyan-fg}NEXT EVENT{/cyan-fg}  {yellow-fg}${d.next_event ? d.next_event.event : 'Mission Complete'}{/yellow-fg}`,
   ];
