@@ -1,11 +1,11 @@
 {
   "name": "artemis-ii-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Terminal-based Artemis II spacecraft tracker with live telemetry from JPL Horizons",
   "type": "module",
   "main": "index.js",
   "bin": {
-    "artemis-ii-cli": "./index.js"
+    "artemis-ii-cli": "index.js"
   },
   "scripts": {
     "start": "node index.js"
