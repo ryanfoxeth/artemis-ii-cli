@@ -283,8 +283,8 @@ function renderTimeline() {
       timeColor = 'green';
     } else {
       dot = `{242-fg} ${BLOCKS.ring}{/242-fg}`;
-      nameColor = 'black';
-      timeColor = 'black';
+      nameColor = '242';
+      timeColor = '242';
     }
 
     const padLen = Math.max(1, 18 - evt.event.length);
