@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import blessed from 'blessed';
-import { fetchTelemetry, MISSION_EVENTS, CREW } from './lib/horizons.js';
+import { fetchTelemetry, getExtrapolatedTelemetry, MISSION_EVENTS, CREW } from './lib/horizons.js';
 
 // ─── State ───────────────────────────────────────────────────────────
 let useMiles = true;
@@ -9,6 +9,7 @@ let telemetry = null;
 let lastUpdate = null;
 let errorMsg = null;
 let refreshTimer = null;
+let tickTimer = null;
 
 const EARTH_MOON_KM = 384_400;
 const EARTH_MOON_MI = Math.round(EARTH_MOON_KM * 0.621371);
@@ -95,9 +96,22 @@ const timelineBox = blessed.box({
   padding: { left: 1, right: 1 },
 });
 
+// ─── Observer Box ───────────────────────────────────────────────────
+const observerBox = blessed.box({
+  parent: mainBox, top: 21, left: '36%', width: '63%', height: 4,
+  label: ` ${BLOCKS.diamond} OBSERVER `,
+  tags: true,
+  border: { type: 'line' },
+  style: {
+    border: { fg: 'cyan' }, label: { fg: 'cyan', bold: true },
+    bg: 'black', fg: 'white',
+  },
+  padding: { left: 1, right: 1 },
+});
+
 // ─── Crew Box ───────────────────────────────────────────────────────
 const crewBox = blessed.box({
-  parent: mainBox, top: 21, left: 1, width: '98%', height: 4,
+  parent: mainBox, top: 25, left: 1, width: '98%', height: 4,
   label: ` ${BLOCKS.diamond} CREW — ARTEMIS II `,
   tags: true,
   border: { type: 'line' },
@@ -117,7 +131,7 @@ const statusBar = blessed.box({
 // ─── Formatting ─────────────────────────────────────────────────────
 function fmtNum(n) {
   if (n == null || isNaN(n)) return '---';
-  return Math.round(n).toLocaleString('en-US');
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtDist(km, mi) {
@@ -297,6 +311,25 @@ function renderTimeline() {
   timelineBox.setContent(lines.join('\n'));
 }
 
+function renderObserver() {
+  if (!telemetry || !telemetry.observer) {
+    observerBox.setContent(`{yellow-fg}${BLOCKS.medium.repeat(3)} Loading...{/yellow-fg}`);
+    return;
+  }
+  
+  const obs = telemetry.observer;
+  const lt = telemetry.earth.light_time_sec;
+  
+  const delayStr = Number(lt || 0).toFixed(3) + 's';
+
+  const lines = [
+    `{cyan-fg}COMMS DELAY{/cyan-fg}  {bold}{yellow-fg}${delayStr}{/yellow-fg}{/bold}  ` +
+    `               ` +
+    `{cyan-fg}SKY POS{/cyan-fg}  RA ${obs.ra}  DEC ${obs.dec}`
+  ];
+  observerBox.setContent('\n ' + lines.join('\n'));
+}
+
 function renderCrew() {
   const line = CREW.map(c => {
     return `{bold}{white-fg}${c.name}{/white-fg}{/bold} {242-fg}${c.role}{/242-fg}`;
@@ -309,9 +342,9 @@ function renderCrew() {
 function renderStatusBar() {
   const source = `{cyan-fg}${BLOCKS.diamond} JPL Horizons (NASA/JPL){/cyan-fg}`;
   const updated = lastUpdate
-    ? `{cyan-fg}Updated {bold}{white-fg}${lastUpdate}{/white-fg}{/bold}{/cyan-fg}`
-    : `{yellow-fg}${BLOCKS.medium.repeat(2)} Fetching...{/yellow-fg}`;
-  const keys = `{242-fg}q{/242-fg}:quit  {242-fg}m{/242-fg}:${useMiles ? 'km' : 'mi'}  {242-fg}r{/242-fg}:refresh`;
+    ? `{cyan-fg}API sync at {bold}{white-fg}${lastUpdate}{/white-fg}{/bold}{/cyan-fg}`
+    : `{yellow-fg}${BLOCKS.medium.repeat(2)} Fetching API...{/yellow-fg}`;
+  const keys = `{242-fg}q{/242-fg}:quit  {242-fg}m{/242-fg}:${useMiles ? 'km' : 'mi'}  {242-fg}r{/242-fg}:refresh API`;
   statusBar.setContent(` ${source}  ${BLOCKS.dot}  ${updated}  ${BLOCKS.dot}  ${keys}`);
 }
 
@@ -321,6 +354,7 @@ function renderAll() {
   renderTracker();
   renderVelocity();
   renderTimeline();
+  renderObserver();
   renderCrew();
   renderStatusBar();
   screen.render();
@@ -328,26 +362,42 @@ function renderAll() {
 
 // ─── Data Refresh ───────────────────────────────────────────────────
 
-async function refresh() {
+async function refreshAPI() {
   try {
     errorMsg = null;
-    telemetry = await fetchTelemetry();
+    await fetchTelemetry();
+    telemetry = getExtrapolatedTelemetry();
     lastUpdate = nowEDT();
+    renderAll();
   } catch (err) {
-    errorMsg = err.message || 'Failed to fetch data';
+    errorMsg = err.message || 'Failed to fetch API';
+    renderAll();
   }
-  renderAll();
+}
+
+function tickLive() {
+  try {
+    const liveTpl = getExtrapolatedTelemetry();
+    if (liveTpl) {
+      telemetry = liveTpl;
+      renderAll();
+    }
+  } catch (e) {
+    // Fail silently on ticks if extrapolation breaks
+  }
 }
 
 function startRefreshLoop() {
-  refresh();
-  refreshTimer = setInterval(refresh, 120_000);
+  refreshAPI(); // Initial fetch
+  refreshTimer = setInterval(refreshAPI, 120_000); // JPL API sync 2 mins
+  tickTimer = setInterval(tickLive, 250); // Math update 4 FPS
 }
 
 // ─── Keyboard Handlers ─────────────────────────────────────────────
 
 screen.key(['q', 'C-c'], () => {
   if (refreshTimer) clearInterval(refreshTimer);
+  if (tickTimer) clearInterval(tickTimer);
   process.exit(0);
 });
 
@@ -360,7 +410,7 @@ screen.key(['r'], () => {
   lastUpdate = null;
   renderStatusBar();
   screen.render();
-  refresh();
+  refreshAPI();
 });
 
 screen.on('resize', () => renderAll());
