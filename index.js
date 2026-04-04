@@ -223,7 +223,7 @@ function renderTracker() {
     } else if (i < orionPos) {
       chars.push('{yellow-fg}─{/yellow-fg}');
     } else {
-      chars.push('{black-fg}·{/black-fg}');
+      chars.push('{gray-fg}·{/gray-fg}');
     }
   }
   chars.push('{white-fg}●{/white-fg}');
@@ -260,11 +260,11 @@ function renderVelocity() {
   const gauge = progressBar(speedRatio, 28, '█', '░');
 
   const lines = [
-    `{cyan-fg}Vx{/cyan-fg}  {white-fg}${v.vx >= 0 ? '+' : ''}${v.vx.toFixed(3)}{/white-fg} {black-fg}km/s{/black-fg}`,
-    `{cyan-fg}Vy{/cyan-fg}  {white-fg}${v.vy >= 0 ? '+' : ''}${v.vy.toFixed(3)}{/white-fg} {black-fg}km/s{/black-fg}`,
-    `{cyan-fg}Vz{/cyan-fg}  {white-fg}${v.vz >= 0 ? '+' : ''}${v.vz.toFixed(3)}{/white-fg} {black-fg}km/s{/black-fg}`,
+    `{cyan-fg}Vx{/cyan-fg}  {white-fg}${v.vx >= 0 ? '+' : ''}${v.vx.toFixed(3)}{/white-fg} {gray-fg}km/s{/gray-fg}`,
+    `{cyan-fg}Vy{/cyan-fg}  {white-fg}${v.vy >= 0 ? '+' : ''}${v.vy.toFixed(3)}{/white-fg} {gray-fg}km/s{/gray-fg}`,
+    `{cyan-fg}Vz{/cyan-fg}  {white-fg}${v.vz >= 0 ? '+' : ''}${v.vz.toFixed(3)}{/white-fg} {gray-fg}km/s{/gray-fg}`,
     ``,
-    `{cyan-fg}|V|{/cyan-fg} {bold}{white-fg}${mag.toFixed(3)}{/white-fg}{/bold} {black-fg}km/s{/black-fg}`,
+    `{cyan-fg}|V|{/cyan-fg} {bold}{white-fg}${mag.toFixed(3)}{/white-fg}{/bold} {gray-fg}km/s{/gray-fg}`,
     `{cyan-fg}${gauge}{/cyan-fg}`,
   ];
   velocityBox.setContent(lines.join('\n'));
@@ -283,7 +283,7 @@ function renderTimeline() {
 
     // Connector line
     const connector = i < MISSION_EVENTS.length - 1
-      ? (isPast ? '{green-fg}│{/green-fg}' : '{black-fg}│{/black-fg}')
+      ? (isPast ? '{green-fg}│{/green-fg}' : '{gray-fg}│{/gray-fg}')
       : ' ';
 
     // Status indicator
@@ -297,7 +297,7 @@ function renderTimeline() {
       nameColor = 'green';
       timeColor = 'green';
     } else {
-      dot = `{black-fg} ${BLOCKS.ring}{/black-fg}`;
+      dot = `{gray-fg} ${BLOCKS.ring}{/gray-fg}`;
       nameColor = 'black';
       timeColor = 'black';
     }
@@ -313,7 +313,7 @@ function renderTimeline() {
 
 function renderCrew() {
   const line = CREW.map(c => {
-    return `{bold}{white-fg}${c.name}{/white-fg}{/bold} {black-fg}${c.role}{/black-fg}`;
+    return `{bold}{white-fg}${c.name}{/white-fg}{/bold} {gray-fg}${c.role}{/gray-fg}`;
   }).join('  {cyan-fg}│{/cyan-fg}  ');
 
   crewBox.setContent(`\n ${line}`);
@@ -325,7 +325,7 @@ function renderStatusBar() {
   const updated = lastUpdate
     ? `{cyan-fg}Updated {bold}{white-fg}${lastUpdate}{/white-fg}{/bold}{/cyan-fg}`
     : `{yellow-fg}${BLOCKS.medium.repeat(2)} Fetching...{/yellow-fg}`;
-  const keys = `{black-fg}q{/black-fg}:quit  {black-fg}m{/black-fg}:${useMiles ? 'km' : 'mi'}  {black-fg}r{/black-fg}:refresh`;
+  const keys = `{gray-fg}q{/gray-fg}:quit  {gray-fg}m{/gray-fg}:${useMiles ? 'km' : 'mi'}  {gray-fg}r{/gray-fg}:refresh`;
   statusBar.setContent(` ${source}  ${BLOCKS.dot}  ${updated}  ${BLOCKS.dot}  ${keys}`);
 }
 
