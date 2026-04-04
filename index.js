@@ -177,7 +177,7 @@ function progressBar(ratio, width, fillChar = '█', emptyChar = '░') {
 
 function renderTitle() {
   const w = screen.width;
-  const title = `${BLOCKS.tl}${BLOCKS.horiz.repeat(2)} ARTEMIS II TRACKER ${BLOCKS.horiz.repeat(Math.max(0, w - 28))}${BLOCKS.tr}`;
+  const title = `${BLOCKS.tl}${BLOCKS.horiz.repeat(2)} ARTEMIS II TRACKER ${BLOCKS.horiz.repeat(Math.max(0, w - 26))}${BLOCKS.tr}`;
   const met = telemetry ? `MET ${telemetry.mission_elapsed.formatted}` : 'CONNECTING...';
   const metPos = Math.max(0, w - met.length - 4);
   titleBar.setContent(
