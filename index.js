@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 
 import blessed from 'blessed';
-import { fetchTelemetry, MISSION_EVENTS, CREW } from './lib/horizons.js';
+import { fetchTelemetry, getExtrapolatedTelemetry, MISSION_EVENTS, CREW } from './lib/horizons.js';
 
 // ─── State ───────────────────────────────────────────────────────────
 let useMiles = true;
 let telemetry = null;
-let lastUpdate = null;
+let lastUpdateDate = null;
 let errorMsg = null;
 let refreshTimer = null;
+let tickTimer = null;
+
+const TIMEZONES = [
+  { label: 'EST', id: 'America/New_York' },
+  { label: 'CST', id: 'America/Chicago' },
+  { label: 'PST', id: 'America/Los_Angeles' }
+];
+let currentTzIdx = 0;
 
 const EARTH_MOON_KM = 384_400;
 const EARTH_MOON_MI = Math.round(EARTH_MOON_KM * 0.621371);
@@ -95,9 +103,22 @@ const timelineBox = blessed.box({
   padding: { left: 1, right: 1 },
 });
 
+// ─── Observer Box ───────────────────────────────────────────────────
+const observerBox = blessed.box({
+  parent: mainBox, top: 21, left: '36%', width: '63%', height: 4,
+  label: ` ${BLOCKS.diamond} OBSERVER `,
+  tags: true,
+  border: { type: 'line' },
+  style: {
+    border: { fg: 'cyan' }, label: { fg: 'cyan', bold: true },
+    bg: 'black', fg: 'white',
+  },
+  padding: { left: 1, right: 1 },
+});
+
 // ─── Crew Box ───────────────────────────────────────────────────────
 const crewBox = blessed.box({
-  parent: mainBox, top: 21, left: 1, width: '98%', height: 4,
+  parent: mainBox, top: 25, left: 1, width: '98%', height: 4,
   label: ` ${BLOCKS.diamond} CREW — ARTEMIS II `,
   tags: true,
   border: { type: 'line' },
@@ -117,7 +138,7 @@ const statusBar = blessed.box({
 // ─── Formatting ─────────────────────────────────────────────────────
 function fmtNum(n) {
   if (n == null || isNaN(n)) return '---';
-  return Math.round(n).toLocaleString('en-US');
+  return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtDist(km, mi) {
@@ -128,20 +149,22 @@ function fmtSpeed(kmph, mph) {
   return useMiles ? `${fmtNum(mph)} mph` : `${fmtNum(kmph)} km/h`;
 }
 
-function toEDT(isoStr) {
-  const d = new Date(isoStr);
+function fmtTime(isoStrOrDate) {
+  const d = new Date(isoStrOrDate);
+  const tz = TIMEZONES[currentTzIdx];
   return d.toLocaleString('en-US', {
-    timeZone: 'America/New_York',
+    timeZone: tz.id,
     month: 'numeric', day: 'numeric',
     hour: 'numeric', minute: '2-digit', hour12: true,
-  }).replace(',', '');
+  }).replace(',', '') + ' ' + tz.label;
 }
 
-function nowEDT() {
+function nowTime() {
+  const tz = TIMEZONES[currentTzIdx];
   return new Date().toLocaleString('en-US', {
-    timeZone: 'America/New_York',
+    timeZone: tz.id,
     hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
-  }) + ' EDT';
+  }) + ' ' + tz.label;
 }
 
 // ─── Progress bar helper ────────────────────────────────────────────
@@ -222,7 +245,7 @@ function renderTracker() {
   blessed.text({ parent: trackerBox, top: 2, left: 0, content: '●', style: { fg: 'blue', bg: 'black', bold: true }, tags: false });
   blessed.text({ parent: trackerBox, top: 2, left: 1, content: beforeOrion, style: { fg: 'yellow', bg: 'black' }, tags: false });
   blessed.text({ parent: trackerBox, top: 2, left: 1 + orionPos, content: '◆', style: { fg: 'yellow', bg: 'black', bold: true }, tags: false });
-  blessed.text({ parent: trackerBox, top: 2, left: 2 + orionPos, content: afterOrion, style: { fg: 242, bg: 'black' }, tags: false });
+  blessed.text({ parent: trackerBox, top: 2, left: 2 + orionPos, content: afterOrion, style: { fg: 'white', bg: 'black' }, tags: false });
   blessed.text({ parent: trackerBox, top: 2, right: 0, content: '●', style: { fg: 'white', bg: 'black' }, tags: false });
 
   // Labels (row 3)
@@ -246,11 +269,11 @@ function renderVelocity() {
   const gauge = progressBar(speedRatio, 28, '█', '░');
 
   const lines = [
-    `{cyan-fg}Vx{/cyan-fg}  {white-fg}${v.vx >= 0 ? '+' : ''}${v.vx.toFixed(3)}{/white-fg} {242-fg}km/s{/242-fg}`,
-    `{cyan-fg}Vy{/cyan-fg}  {white-fg}${v.vy >= 0 ? '+' : ''}${v.vy.toFixed(3)}{/white-fg} {242-fg}km/s{/242-fg}`,
-    `{cyan-fg}Vz{/cyan-fg}  {white-fg}${v.vz >= 0 ? '+' : ''}${v.vz.toFixed(3)}{/white-fg} {242-fg}km/s{/242-fg}`,
+    `{cyan-fg}Vx{/cyan-fg}  {white-fg}${v.vx >= 0 ? '+' : ''}${v.vx.toFixed(3)}{/white-fg} {white-fg}km/s{/white-fg}`,
+    `{cyan-fg}Vy{/cyan-fg}  {white-fg}${v.vy >= 0 ? '+' : ''}${v.vy.toFixed(3)}{/white-fg} {white-fg}km/s{/white-fg}`,
+    `{cyan-fg}Vz{/cyan-fg}  {white-fg}${v.vz >= 0 ? '+' : ''}${v.vz.toFixed(3)}{/white-fg} {white-fg}km/s{/white-fg}`,
     ``,
-    `{cyan-fg}|V|{/cyan-fg} {bold}{white-fg}${mag.toFixed(3)}{/white-fg}{/bold} {242-fg}km/s{/242-fg}`,
+    `{cyan-fg}|V|{/cyan-fg} {bold}{white-fg}${mag.toFixed(3)}{/white-fg}{/bold} {white-fg}km/s{/white-fg}`,
     `{cyan-fg}${gauge}{/cyan-fg}`,
   ];
   velocityBox.setContent(lines.join('\n'));
@@ -258,19 +281,15 @@ function renderVelocity() {
 
 function renderTimeline() {
   const now = new Date();
+  const mStart = new Date('2026-04-01T22:35:00Z');
   let currentIdx = -1;
   for (let i = 0; i < MISSION_EVENTS.length; i++) {
     if (now >= new Date(MISSION_EVENTS[i].time)) currentIdx = i;
   }
 
   const lines = MISSION_EVENTS.map((evt, i) => {
-    const isPast = i <= currentIdx;
+    const isPast = i < currentIdx;
     const isCurrent = i === currentIdx;
-
-    // Connector line
-    const connector = i < MISSION_EVENTS.length - 1
-      ? (isPast ? '{green-fg}│{/green-fg}' : '{242-fg}│{/242-fg}')
-      : ' ';
 
     // Status indicator
     let dot, nameColor, timeColor;
@@ -281,25 +300,54 @@ function renderTimeline() {
     } else if (isPast) {
       dot = `{green-fg} ${BLOCKS.circle}{/green-fg}`;
       nameColor = 'green';
-      timeColor = 'green';
+      timeColor = 'white';
     } else {
-      dot = `{242-fg} ${BLOCKS.ring}{/242-fg}`;
-      nameColor = '242';
-      timeColor = '242';
+      dot = `{white-fg} ${BLOCKS.ring}{/white-fg}`;
+      nameColor = 'white';
+      timeColor = 'white';
     }
 
-    const padLen = Math.max(1, 18 - evt.event.length);
-    const timeStr = toEDT(evt.time) + ' EDT';
+    const timeStr = fmtTime(evt.time);
+    
+    // Calculate abbreviated expected MET
+    const evtTime = new Date(evt.time);
+    const diff = evtTime - mStart;
+    const isNegative = diff < 0;
+    const absDiff = Math.abs(diff);
+    const d = Math.floor(absDiff / 86400000);
+    const h = Math.floor((absDiff % 86400000) / 3600000);
+    const sign = isNegative ? 'T-' : 'T+';
+    const metStr = `(${sign}${d}d ${h.toString().padStart(2, '0')}h)`;
 
-    return `${dot} {${nameColor}-fg}${evt.event}{/${nameColor}-fg}${' '.repeat(padLen)}{${timeColor}-fg}${timeStr}{/${timeColor}-fg}`;
+    const padLen = Math.max(1, 16 - evt.event.length);
+    return `${dot} {${nameColor}-fg}${evt.event}{/${nameColor}-fg}${' '.repeat(padLen)}{${timeColor}-fg}${timeStr} ${metStr}{/${timeColor}-fg}`;
   });
 
   timelineBox.setContent(lines.join('\n'));
 }
 
+function renderObserver() {
+  if (!telemetry || !telemetry.observer) {
+    observerBox.setContent(`{yellow-fg}${BLOCKS.medium.repeat(3)} Loading...{/yellow-fg}`);
+    return;
+  }
+  
+  const obs = telemetry.observer;
+  const lt = telemetry.earth.light_time_sec;
+  
+  const delayStr = Number(lt || 0).toFixed(3) + 's';
+
+  const lines = [
+    `{cyan-fg}COMMS DELAY{/cyan-fg}  {bold}{yellow-fg}${delayStr}{/yellow-fg}{/bold}  ` +
+    `               ` +
+    `{cyan-fg}SKY POS{/cyan-fg}  RA ${obs.ra}  DEC ${obs.dec}`
+  ];
+  observerBox.setContent('\n ' + lines.join('\n'));
+}
+
 function renderCrew() {
   const line = CREW.map(c => {
-    return `{bold}{white-fg}${c.name}{/white-fg}{/bold} {242-fg}${c.role}{/242-fg}`;
+    return `{bold}{white-fg}${c.name}{/white-fg}{/bold} {white-fg}${c.role}{/white-fg}`;
   }).join('  {cyan-fg}│{/cyan-fg}  ');
 
   crewBox.setContent(`\n ${line}`);
@@ -308,10 +356,10 @@ function renderCrew() {
 
 function renderStatusBar() {
   const source = `{cyan-fg}${BLOCKS.diamond} JPL Horizons (NASA/JPL){/cyan-fg}`;
-  const updated = lastUpdate
-    ? `{cyan-fg}Updated {bold}{white-fg}${lastUpdate}{/white-fg}{/bold}{/cyan-fg}`
-    : `{yellow-fg}${BLOCKS.medium.repeat(2)} Fetching...{/yellow-fg}`;
-  const keys = `{242-fg}q{/242-fg}:quit  {242-fg}m{/242-fg}:${useMiles ? 'km' : 'mi'}  {242-fg}r{/242-fg}:refresh`;
+  const updated = lastUpdateDate
+    ? `{cyan-fg}API sync at {bold}{white-fg}${fmtTime(lastUpdateDate)}{/white-fg}{/bold}{/cyan-fg}`
+    : `{yellow-fg}${BLOCKS.medium.repeat(2)} Fetching API...{/yellow-fg}`;
+  const keys = `{white-fg}q{/white-fg}:quit  {white-fg}m{/white-fg}:${useMiles ? 'km' : 'mi'}  {white-fg}t{/white-fg}:tz (${TIMEZONES[currentTzIdx].label})  {white-fg}r{/white-fg}:refresh API`;
   statusBar.setContent(` ${source}  ${BLOCKS.dot}  ${updated}  ${BLOCKS.dot}  ${keys}`);
 }
 
@@ -321,6 +369,7 @@ function renderAll() {
   renderTracker();
   renderVelocity();
   renderTimeline();
+  renderObserver();
   renderCrew();
   renderStatusBar();
   screen.render();
@@ -328,26 +377,42 @@ function renderAll() {
 
 // ─── Data Refresh ───────────────────────────────────────────────────
 
-async function refresh() {
+async function refreshAPI() {
   try {
     errorMsg = null;
-    telemetry = await fetchTelemetry();
-    lastUpdate = nowEDT();
+    await fetchTelemetry();
+    telemetry = getExtrapolatedTelemetry();
+    lastUpdateDate = new Date();
+    renderAll();
   } catch (err) {
-    errorMsg = err.message || 'Failed to fetch data';
+    errorMsg = err.message || 'Failed to fetch API';
+    renderAll();
   }
-  renderAll();
+}
+
+function tickLive() {
+  try {
+    const liveTpl = getExtrapolatedTelemetry();
+    if (liveTpl) {
+      telemetry = liveTpl;
+      renderAll();
+    }
+  } catch (e) {
+    // Fail silently on ticks if extrapolation breaks
+  }
 }
 
 function startRefreshLoop() {
-  refresh();
-  refreshTimer = setInterval(refresh, 120_000);
+  refreshAPI(); // Initial fetch
+  refreshTimer = setInterval(refreshAPI, 120_000); // JPL API sync 2 mins
+  tickTimer = setInterval(tickLive, 250); // Math update 4 FPS
 }
 
 // ─── Keyboard Handlers ─────────────────────────────────────────────
 
 screen.key(['q', 'C-c'], () => {
   if (refreshTimer) clearInterval(refreshTimer);
+  if (tickTimer) clearInterval(tickTimer);
   process.exit(0);
 });
 
@@ -356,11 +421,16 @@ screen.key(['m'], () => {
   renderAll();
 });
 
+screen.key(['t'], () => {
+  currentTzIdx = (currentTzIdx + 1) % TIMEZONES.length;
+  renderAll();
+});
+
 screen.key(['r'], () => {
-  lastUpdate = null;
+  lastUpdateDate = null;
   renderStatusBar();
   screen.render();
-  refresh();
+  refreshAPI();
 });
 
 screen.on('resize', () => renderAll());
