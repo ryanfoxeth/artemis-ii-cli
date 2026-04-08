@@ -25,7 +25,7 @@ npx artemis-ii-cli
 Or clone and run locally:
 
 ```bash
-git clone https://github.com/yourusername/artemis-ii-cli.git
+git clone https://github.com/ryanfoxeth/artemis-ii-cli.git
 cd artemis-ii-cli
 npm install
 npm start
